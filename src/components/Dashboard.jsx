@@ -14,10 +14,17 @@ import {
   Zap,
 } from "lucide-react";
 
+import Overview from "./pages/Overview";
+import ManageTenants from "./pages/ManageTenants";
+import PaymentsTracking from "./pages/PaymentsTracking";
+import UtilitiesControl from "./pages/UtilitiesControl";
+import Reports from "./pages/Reports";
+
 function Dashboard() {
   const { role } = useParams();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePage, setActivePage] = useState("overview");
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("currentUser"));
@@ -31,6 +38,27 @@ function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem("currentUser");
     navigate("/login");
+  };
+
+  const renderContent = () => {
+    switch (activePage) {
+      case "overview":
+        return <Overview role={role} />;
+      case "tenants":
+        return <ManageTenants />;
+      case "payments":
+        return <PaymentsTracking />;
+      case "utilities":
+        return <UtilitiesControl />;
+      case "reports":
+        return <Reports />;
+      default:
+        return (
+          <div className="text-gray-500 text-center py-10">
+            <p>Page under construction...</p>
+          </div>
+        );
+    }
   };
 
   return (
@@ -51,35 +79,79 @@ function Dashboard() {
 
         {/* Sidebar Links */}
         <nav className="space-y-3 mt-6">
+          <button
+            onClick={() => setActivePage("overview")}
+            className={`flex w-full items-center gap-2 px-2 py-2 rounded-md ${
+              activePage === "overview" ? "bg-blue-700" : "hover:bg-blue-800"
+            }`}
+          >
+            <Home className="w-5 h-5" /> Overview
+          </button>
+
           {role === "tenant" ? (
             <>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              <button
+                onClick={() => setActivePage("payments")}
+                className="flex w-full items-center gap-2 px-2 py-2 rounded-md hover:bg-blue-800"
+              >
                 <CreditCard className="w-5 h-5" /> My Payments
-              </a>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              </button>
+              <button
+                onClick={() => setActivePage("statements")}
+                className="flex w-full items-center gap-2 px-2 py-2 rounded-md hover:bg-blue-800"
+              >
                 <FileText className="w-5 h-5" /> Mpesa Statements
-              </a>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              </button>
+              <button
+                onClick={() => setActivePage("notifications")}
+                className="flex w-full items-center gap-2 px-2 py-2 rounded-md hover:bg-blue-800"
+              >
                 <Bell className="w-5 h-5" /> Notifications
-              </a>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              </button>
+              <button
+                onClick={() => setActivePage("profile")}
+                className="flex w-full items-center gap-2 px-2 py-2 rounded-md hover:bg-blue-800"
+              >
                 <User className="w-5 h-5" /> Profile
-              </a>
+              </button>
             </>
           ) : (
             <>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              <button
+                onClick={() => setActivePage("tenants")}
+                className={`flex w-full items-center gap-2 px-2 py-2 rounded-md ${
+                  activePage === "tenants" ? "bg-blue-700" : "hover:bg-blue-800"
+                }`}
+              >
                 <Users className="w-5 h-5" /> Manage Tenants
-              </a>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              </button>
+
+              <button
+                onClick={() => setActivePage("payments")}
+                className={`flex w-full items-center gap-2 px-2 py-2 rounded-md ${
+                  activePage === "payments" ? "bg-blue-700" : "hover:bg-blue-800"
+                }`}
+              >
                 <CreditCard className="w-5 h-5" /> Payments Tracking
-              </a>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              </button>
+
+              <button
+                onClick={() => setActivePage("utilities")}
+                className={`flex w-full items-center gap-2 px-2 py-2 rounded-md ${
+                  activePage === "utilities" ? "bg-blue-700" : "hover:bg-blue-800"
+                }`}
+              >
                 <Zap className="w-5 h-5" /> Utilities Control
-              </a>
-              <a href="#" className="flex items-center gap-2 hover:text-amber-400">
+              </button>
+
+              <button
+                onClick={() => setActivePage("reports")}
+                className={`flex w-full items-center gap-2 px-2 py-2 rounded-md ${
+                  activePage === "reports" ? "bg-blue-700" : "hover:bg-blue-800"
+                }`}
+              >
                 <BarChart3 className="w-5 h-5" /> Reports
-              </a>
+              </button>
             </>
           )}
         </nav>
@@ -124,34 +196,8 @@ function Dashboard() {
           </div>
         </header>
 
-        {/* Content Area */}
-        <main className="p-6 flex-1">
-          <h1 className="text-2xl font-bold text-blue-900 mb-6">
-            Welcome {role === "tenant" ? "Tenant" : "Landlord"}
-          </h1>
-
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            {role === "tenant" ? (
-              <>
-                <h2 className="text-lg font-bold mb-4">Your Payment History</h2>
-                <ul className="space-y-2">
-                  <li className="p-3 bg-gray-100 rounded">✅ Paid Rent - Sept 2025</li>
-                  <li className="p-3 bg-gray-100 rounded">✅ Paid Rent - Aug 2025</li>
-                  <li className="p-3 bg-gray-100 rounded">⚠️ Due Payment - Oct 2025</li>
-                </ul>
-              </>
-            ) : (
-              <>
-                <h2 className="text-lg font-bold mb-4">Tenant Overview</h2>
-                <ul className="space-y-2">
-                  <li className="p-3 bg-gray-100 rounded">John Doe - Unit A3 - Paid</li>
-                  <li className="p-3 bg-gray-100 rounded">Jane Smith - Unit B1 - ⚠️ Due</li>
-                  <li className="p-3 bg-gray-100 rounded">Mike Lee - Unit C2 - Paid</li>
-                </ul>
-              </>
-            )}
-          </div>
-        </main>
+        {/* Dynamic Content */}
+        <main className="p-6 flex-1">{renderContent()}</main>
       </div>
     </div>
   );
