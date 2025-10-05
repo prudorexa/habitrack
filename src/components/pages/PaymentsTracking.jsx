@@ -1,63 +1,51 @@
 import React, { useState, useEffect } from "react";
-import { DollarSign, User } from "lucide-react";
+import { DollarSign, Users, CreditCard, PlusCircle } from "lucide-react";
 
 const TENANTS_KEY = "habitrack.tenants";
 const PAYMENTS_KEY = "habitrack.payments";
 
 export default function PaymentTracking() {
-  const [payments, setPayments] = useState(() => {
-    try {
-      const data = localStorage.getItem(PAYMENTS_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  });
-
+  const [payments, setPayments] = useState([]);
   const [tenants, setTenants] = useState([]);
-  const [selectedTenant, setSelectedTenant] = useState(null);
   const [form, setForm] = useState({
     tenant: "",
     amount: "",
     date: "",
     method: "",
   });
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const loadTenants = () => {
-    try {
-      const data = localStorage.getItem(TENANTS_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (Array.isArray(parsed)) setTenants(parsed);
-      }
-    } catch (err) {
-      console.error("Error reading tenants:", err);
-    }
-  };
-
+  // ✅ Load Data from localStorage (only once)
   useEffect(() => {
-    loadTenants();
+    const storedTenants = JSON.parse(localStorage.getItem(TENANTS_KEY)) || [];
+    const storedPayments = JSON.parse(localStorage.getItem(PAYMENTS_KEY)) || [];
 
-    const handleStorageChange = (e) => {
-      if (e.key === TENANTS_KEY) {
-        loadTenants();
-        console.log("[HabiTrack] Tenants list updated from storage");
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    setTenants(storedTenants);
+    setPayments(storedPayments);
   }, []);
 
+  // ✅ Listen for changes from other tabs/pages (sync ManageTenants updates)
   useEffect(() => {
-    localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
-  }, [payments]);
+    const handleStorage = (event) => {
+      if (event.key === TENANTS_KEY) {
+        const updatedTenants = JSON.parse(event.newValue) || [];
+        setTenants(updatedTenants);
+      }
+      if (event.key === PAYMENTS_KEY) {
+        const updatedPayments = JSON.parse(event.newValue) || [];
+        setPayments(updatedPayments);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
-  const handleTenantSelect = (tenantName) => {
-    setForm((f) => ({ ...f, tenant: tenantName }));
-    const tenant = tenants.find((t) => t.name === tenantName);
-    setSelectedTenant(tenant || null);
-  };
+  // ✅ Save payments whenever they change
+  useEffect(() => {
+    if (payments.length > 0) {
+      localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
+    }
+  }, [payments]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -66,33 +54,83 @@ export default function PaymentTracking() {
       return;
     }
 
-    const newPayment = {
-      id: Date.now(),
-      ...form,
-    };
-    setPayments((prev) => [...prev, newPayment]);
+    const newPayment = { id: Date.now(), ...form };
+    const updatedPayments = [...payments, newPayment];
+    setPayments(updatedPayments);
+    localStorage.setItem(PAYMENTS_KEY, JSON.stringify(updatedPayments));
     setForm({ tenant: "", amount: "", date: "", method: "" });
-    setSelectedTenant(null);
   };
 
+  const filteredPayments = payments.filter((p) =>
+    p.tenant.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // ✅ Summary values
+  const totalPayments = payments.reduce(
+    (sum, p) => sum + Number(p.amount || 0),
+    0
+  );
+  const totalTenants = tenants.length;
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8 animate-fadeIn">
       {/* Header */}
-      <h2 className="text-3xl font-bold text-green-700 flex items-center gap-3">
-        <DollarSign size={28} /> Payment Tracking
-      </h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+        <h2 className="text-3xl font-bold text-green-700 flex items-center gap-2">
+          <DollarSign size={30} /> Payment Tracking
+        </h2>
+        <div className="flex items-center gap-2 mt-3 sm:mt-0">
+          <input
+            type="text"
+            placeholder="Search by tenant..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="border p-2 rounded-lg shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-gradient-to-r from-green-100 to-green-200 p-5 rounded-2xl shadow hover:shadow-md transition">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-green-800">Total Tenants</h3>
+            <Users className="text-green-600" />
+          </div>
+          <p className="text-2xl font-bold text-green-900 mt-2">{totalTenants}</p>
+        </div>
+
+        <div className="bg-gradient-to-r from-blue-100 to-blue-200 p-5 rounded-2xl shadow hover:shadow-md transition">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-blue-800">Total Payments</h3>
+            <CreditCard className="text-blue-600" />
+          </div>
+          <p className="text-2xl font-bold text-blue-900 mt-2">Ksh {totalPayments}</p>
+        </div>
+
+        <div className="bg-gradient-to-r from-amber-100 to-amber-200 p-5 rounded-2xl shadow hover:shadow-md transition">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-amber-800">Payment Records</h3>
+            <PlusCircle className="text-amber-600" />
+          </div>
+          <p className="text-2xl font-bold text-amber-900 mt-2">{payments.length}</p>
+        </div>
+      </div>
 
       {/* Payment Form */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white shadow rounded-xl p-6 max-w-3xl mx-auto border space-y-4"
+        className="bg-white shadow-lg border rounded-2xl p-6 max-w-4xl mx-auto space-y-4 hover:shadow-xl transition"
       >
+        <h3 className="text-xl font-semibold text-gray-700 flex items-center gap-2">
+          <PlusCircle className="text-green-600" /> Add New Payment
+        </h3>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Tenant selection */}
           <select
-            className="border p-3 rounded"
+            className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
             value={form.tenant}
-            onChange={(e) => handleTenantSelect(e.target.value)}
+            onChange={(e) => setForm({ ...form, tenant: e.target.value })}
           >
             <option value="">Select tenant</option>
             {tenants.map((t) => (
@@ -103,58 +141,36 @@ export default function PaymentTracking() {
           </select>
 
           <input
-            className="border p-3 rounded"
-            placeholder="Amount"
+            className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
+            placeholder="Amount (Ksh)"
             type="number"
             value={form.amount}
-            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+            onChange={(e) => setForm({ ...form, amount: e.target.value })}
           />
 
           <input
-            className="border p-3 rounded"
+            className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
             type="date"
             value={form.date}
-            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
           />
 
           <select
-            className="border p-3 rounded"
+            className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
             value={form.method}
-            onChange={(e) => setForm((f) => ({ ...f, method: e.target.value }))}
+            onChange={(e) => setForm({ ...form, method: e.target.value })}
           >
-            <option value="">Select method</option>
+            <option value="">Select payment method</option>
             <option value="Cash">Cash</option>
             <option value="Bank Transfer">Bank Transfer</option>
             <option value="M-Pesa">M-Pesa</option>
           </select>
         </div>
 
-        {/* ✅ Selected Tenant Summary Card */}
-        {selectedTenant && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-4 shadow-sm transition">
-            <div className="bg-green-100 p-3 rounded-full">
-              <User className="w-6 h-6 text-green-700" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-green-800">
-                {selectedTenant.name}
-              </h3>
-              <p className="text-sm text-gray-600">
-                Unit: {selectedTenant.unit}
-              </p>
-              {selectedTenant.contact && (
-                <p className="text-sm text-gray-600">
-                  Contact: {selectedTenant.contact}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
         <div className="text-right">
           <button
             type="submit"
-            className="bg-green-600 text-white px-5 py-2 rounded hover:bg-green-700 transition"
+            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 shadow transition"
           >
             Add Payment
           </button>
@@ -162,7 +178,7 @@ export default function PaymentTracking() {
       </form>
 
       {/* Payment Table */}
-      <div className="bg-white rounded-xl shadow border mt-6">
+      <div className="bg-white rounded-2xl shadow-lg border mt-8">
         <div className="p-4 border-b">
           <h4 className="text-lg font-semibold text-gray-700">
             Payment Records
@@ -180,15 +196,18 @@ export default function PaymentTracking() {
               </tr>
             </thead>
             <tbody>
-              {payments.length === 0 ? (
+              {filteredPayments.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="p-6 text-center text-gray-500">
                     No payments recorded yet.
                   </td>
                 </tr>
               ) : (
-                payments.map((p) => (
-                  <tr key={p.id} className="border-t hover:bg-gray-50">
+                filteredPayments.map((p) => (
+                  <tr
+                    key={p.id}
+                    className="border-t hover:bg-green-50 transition duration-150"
+                  >
                     <td className="p-3">{p.tenant}</td>
                     <td className="p-3">{p.amount}</td>
                     <td className="p-3">{p.date}</td>
