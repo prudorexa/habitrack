@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import homeImg from "../assets/home4.avif"; // new high-res image
+import homeImg from "../assets/home4.avif"; // high-res image
 
 export default function Register() {
   const navigate = useNavigate();
@@ -9,33 +9,41 @@ export default function Register() {
     email: "",
     password: "",
     role: "tenant",
+    photo: "", // store profile photo
   });
 
-  // useEffect(() => {
-  //   // Redirect to dashboard if already logged in
-  //   const loggedInUser =
-  //     JSON.parse(localStorage.getItem("currentUserLoggedIn")) ||
-  //     JSON.parse(sessionStorage.getItem("currentUserLoggedIn"));
-  //   if (loggedInUser) {
-  //     navigate(`/dashboard/${loggedInUser.role}`);
-  //   }
-  // }, [navigate]);
+  useEffect(() => {
+    // Redirect to dashboard if already logged in
+    const loggedInUser =
+      JSON.parse(localStorage.getItem("currentUserLoggedIn")) ||
+      JSON.parse(sessionStorage.getItem("currentUserLoggedIn"));
+    if (loggedInUser) {
+      navigate(`/dashboard/${loggedInUser.role}`);
+    }
+  }, [navigate]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => setForm({ ...form, photo: reader.result });
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     let users = JSON.parse(localStorage.getItem("users")) || [];
 
-    // Check if email already exists
     if (users.some((u) => u.email === form.email)) {
       alert("Email already registered!");
       return;
     }
 
-    // Add new user
     users.push(form);
     localStorage.setItem("users", JSON.stringify(users));
 
@@ -112,6 +120,16 @@ export default function Register() {
                 <option value="tenant">Tenant</option>
                 <option value="landlord">Landlord</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-gray-700 font-medium mb-1">Profile Photo (optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="w-full text-sm text-gray-600"
+              />
             </div>
 
             <button

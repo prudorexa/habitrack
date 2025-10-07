@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import houseImg from "../assets/home3.avif"; // import your image
+import houseImg from "../assets/home3.avif";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -8,19 +8,19 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
-  // useEffect(() => {
-  //   // Auto-login if previously logged in
-  //   const loggedInUser =
-  //     JSON.parse(localStorage.getItem("currentUserLoggedIn")) ||
-  //     JSON.parse(sessionStorage.getItem("currentUserLoggedIn"));
-  //   if (loggedInUser) {
-  //     navigate(`/dashboard/${loggedInUser.role}`);
-  //   } else {
-  //     // Redirect to register if no users exist
-  //     const users = JSON.parse(localStorage.getItem("users")) || [];
-  //     if (users.length === 0) navigate("/register");
-  //   }
-  // }, [navigate]);
+  useEffect(() => {
+    // Auto-login if previously logged in
+    const loggedInUser =
+      JSON.parse(localStorage.getItem("currentUserLoggedIn")) ||
+      JSON.parse(sessionStorage.getItem("currentUserLoggedIn"));
+    if (loggedInUser) {
+      navigate(`/dashboard/${loggedInUser.role}`);
+    } else {
+      // Redirect to register if no users exist
+      const users = JSON.parse(localStorage.getItem("users")) || [];
+      if (users.length === 0) navigate("/register");
+    }
+  }, [navigate]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
