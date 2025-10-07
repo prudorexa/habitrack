@@ -3,7 +3,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
-import { UserPlus, Search, Trash2, Edit2, Upload, Download } from "lucide-react";
+import {
+  UserPlus,
+  Search,
+  Trash2,
+  Edit2,
+  Upload,
+  Download,
+} from "lucide-react";
 
 const STORAGE_KEY = "habitrack.tenants";
 const STATUSES = ["Active", "Vacated", "Pending"];
@@ -98,7 +105,11 @@ export default function ManageTenants() {
     const normalized = { ...form, rent: form.rent ? Number(form.rent) : 0 };
 
     if (editingId) {
-      setTenants((prev) => prev.map((t) => (t.id === editingId ? { ...normalized, id: editingId } : t)));
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === editingId ? { ...normalized, id: editingId } : t
+        )
+      );
     } else {
       const newTenant = { ...normalized, id: Date.now() };
       setTenants((prev) => [...prev, newTenant]);
@@ -120,8 +131,19 @@ export default function ManageTenants() {
 
   // Export CSV
   const handleExportCSV = () => {
-    const header = ["id", "name", "unit", "contact", "email", "rent", "status", "dateJoined"];
-    const rows = tenants.map((t) => header.map((k) => JSON.stringify(t[k] ?? "")).join(","));
+    const header = [
+      "id",
+      "name",
+      "unit",
+      "contact",
+      "email",
+      "rent",
+      "status",
+      "dateJoined",
+    ];
+    const rows = tenants.map((t) =>
+      header.map((k) => JSON.stringify(t[k] ?? "")).join(",")
+    );
     const csvContent = [header.join(","), ...rows].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -148,7 +170,8 @@ export default function ManageTenants() {
         headers.forEach((h, i) => {
           obj[h] = values[i] ? values[i].replace(/^"|"$/g, "").trim() : "";
         });
-        obj.id = Number(obj.id) || Date.now() + Math.floor(Math.random() * 1000);
+        obj.id =
+          Number(obj.id) || Date.now() + Math.floor(Math.random() * 1000);
         // ensure rent numeric
         obj.rent = obj.rent ? Number(obj.rent) : 0;
         return obj;
@@ -169,7 +192,9 @@ export default function ManageTenants() {
   const filteredTenants = useMemo(() => {
     const q = search.toLowerCase().trim();
     return tenants
-      .filter((t) => (statusFilter === "All" ? true : t.status === statusFilter))
+      .filter((t) =>
+        statusFilter === "All" ? true : t.status === statusFilter
+      )
       .filter((t) => {
         if (!q) return true;
         return (
@@ -186,15 +211,26 @@ export default function ManageTenants() {
       <div className="flex flex-wrap items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-indigo-700">Manage Tenants</h1>
         <div className="flex gap-3">
-          <Button onClick={handleAddTenant} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Button
+            onClick={handleAddTenant}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
             <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
           </Button>
-          <Button onClick={handleExportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button
+            onClick={handleExportCSV}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
             <Download className="w-4 h-4 mr-2" /> Export CSV
           </Button>
           <label className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md cursor-pointer flex items-center gap-2">
             <Upload className="w-4 h-4" /> Import CSV
-            <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleImportCSV}
+            />
           </label>
         </div>
       </div>
@@ -251,7 +287,10 @@ export default function ManageTenants() {
                   </tr>
                 ) : (
                   filteredTenants.map((t) => (
-                    <tr key={t.id} className="border-b hover:bg-indigo-50 transition">
+                    <tr
+                      key={t.id}
+                      className="border-b hover:bg-indigo-50 transition"
+                    >
                       <td className="p-3">{t.name}</td>
                       <td className="p-3">{t.unit}</td>
                       <td className="p-3">{t.contact}</td>
@@ -290,11 +329,20 @@ export default function ManageTenants() {
               <h2 className="text-lg font-semibold text-indigo-600">
                 {editingId ? "Edit Tenant" : "Add Tenant"}
               </h2>
-              <button onClick={() => { setModalOpen(false); setEditingId(null); }} className="text-slate-500 hover:text-slate-800">
+              <button
+                onClick={() => {
+                  setModalOpen(false);
+                  setEditingId(null);
+                }}
+                className="text-slate-500 hover:text-slate-800"
+              >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleSaveTenant} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form
+              onSubmit={handleSaveTenant}
+              className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4"
+            >
               <div>
                 <Label>Name</Label>
                 <Input
@@ -315,7 +363,9 @@ export default function ManageTenants() {
                 <Label>Contact</Label>
                 <Input
                   value={form.contact}
-                  onChange={(e) => setForm({ ...form, contact: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, contact: e.target.value })
+                  }
                   placeholder="+254 7xx xxx xxx"
                 />
               </div>
@@ -353,14 +403,39 @@ export default function ManageTenants() {
                 <Input
                   type="date"
                   value={form.dateJoined}
-                  onChange={(e) => setForm({ ...form, dateJoined: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, dateJoined: e.target.value })
+                  }
                 />
               </div>
+              <input
+                type="number"
+                placeholder="Monthly Rent (Ksh)"
+                className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
+                value={form.rentAmount || ""}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    rentAmount: Number(e.target.value),
+                  }))
+                }
+              />
+
               <div className="md:col-span-2 flex justify-end mt-4">
-                <Button type="button" onClick={() => { setModalOpen(false); setEditingId(null); }} className="mr-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setModalOpen(false);
+                    setEditingId(null);
+                  }}
+                  className="mr-2"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button
+                  type="submit"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
                   {editingId ? "Save Changes" : "Add Tenant"}
                 </Button>
               </div>

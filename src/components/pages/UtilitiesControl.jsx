@@ -16,98 +16,177 @@ import {
   Legend,
 } from "recharts";
 
-const TENANTS_KEY = "habitrack.tenants";
-const UTILITIES_KEY = "habitrack.utilities";
+/**
+ * UtilitiesControl.jsx — with edit support & safe localStorage sync
+ */
+
+const HABITRACK_TENANTS_KEY = "habitrack.tenants";
+const HABITRACK_UTILITIES_KEY = "habitrack.utilities";
+
+const TENANTS_FALLBACK_KEYS = [
+  HABITRACK_TENANTS_KEY,
+  "tenants",
+  "habitrack_tenants",
+  "habitrack:tenants",
+];
+
+const UTILITIES_FALLBACK_KEYS = [
+  HABITRACK_UTILITIES_KEY,
+  "utilities",
+  "habitrack_utilities",
+  "habitrack:utilities",
+];
+
 const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
+function tryParseJSON(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function loadAndMaybeMigrateArray(fallbackKeys = [], canonicalKey) {
+  for (const k of fallbackKeys) {
+    const raw = localStorage.getItem(k);
+    if (!raw) continue;
+    const parsed = tryParseJSON(raw);
+    if (Array.isArray(parsed)) {
+      if (k !== canonicalKey) {
+        try {
+          localStorage.setItem(canonicalKey, JSON.stringify(parsed));
+          console.info(`[HabiTrack] Migrated data from "${k}" → "${canonicalKey}"`);
+        } catch (err) {
+          console.warn("[HabiTrack] migration write failed:", err);
+        }
+      }
+      return parsed;
+    }
+  }
+  return [];
+}
+
+function persistIfChanged(key, value) {
+  try {
+    const existing = localStorage.getItem(key);
+    const serialized = JSON.stringify(value || []);
+    if (existing !== serialized) {
+      localStorage.setItem(key, serialized);
+    }
+  } catch (err) {
+    console.error("[HabiTrack] Error persisting to localStorage:", err);
+  }
+}
+
 export default function UtilitiesControl() {
-  const [utilities, setUtilities] = useState([]);
-  const [tenants, setTenants] = useState([]);
+  const [utilities, setUtilities] = useState(() =>
+    loadAndMaybeMigrateArray(UTILITIES_FALLBACK_KEYS, HABITRACK_UTILITIES_KEY)
+  );
+  const [tenants, setTenants] = useState(() =>
+    loadAndMaybeMigrateArray(TENANTS_FALLBACK_KEYS, HABITRACK_TENANTS_KEY)
+  );
+
   const [formData, setFormData] = useState({
+    id: null,
     tenant: "",
     utilityType: "",
     amount: "",
     date: "",
   });
+
+  const [isEditing, setIsEditing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [chartType, setChartType] = useState("bar");
 
-  // Load tenants and utilities on mount
+  // persist changes
   useEffect(() => {
-    try {
-      const storedTenants = JSON.parse(localStorage.getItem(TENANTS_KEY)) || [];
-      setTenants(Array.isArray(storedTenants) ? storedTenants : []);
-      console.log("Loaded tenants:", storedTenants);
-    } catch (err) {
-      console.error("Error reading tenants:", err);
-    }
-
-    try {
-      const storedUtilities =
-        JSON.parse(localStorage.getItem(UTILITIES_KEY)) || [];
-      setUtilities(Array.isArray(storedUtilities) ? storedUtilities : []);
-      console.log("Loaded utilities:", storedUtilities);
-    } catch (err) {
-      console.error("Error reading utilities:", err);
-    }
-  }, []);
-
-  // Save utilities to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(UTILITIES_KEY, JSON.stringify(utilities));
+    persistIfChanged(HABITRACK_UTILITIES_KEY, utilities);
   }, [utilities]);
 
-  // Handle field change
+  useEffect(() => {
+    persistIfChanged(HABITRACK_TENANTS_KEY, tenants);
+  }, [tenants]);
+
+  // cross-tab sync
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e.key) return;
+      if (UTILITIES_FALLBACK_KEYS.includes(e.key)) {
+        const parsed = tryParseJSON(e.newValue);
+        setUtilities(Array.isArray(parsed) ? parsed : []);
+      }
+      if (TENANTS_FALLBACK_KEYS.includes(e.key)) {
+        const parsed = tryParseJSON(e.newValue);
+        setTenants(Array.isArray(parsed) ? parsed : []);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // handle form input
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Add new utility record
+  // add or update record
   const handleAddUtility = (e) => {
-    e.preventDefault();
-    if (
-      !formData.tenant ||
-      !formData.utilityType ||
-      !formData.amount ||
-      !formData.date
-    ) {
+    e && e.preventDefault?.();
+    if (!formData.tenant || !formData.utilityType || formData.amount === "" || !formData.date) {
       alert("Please fill in all fields!");
       return;
     }
 
-    const newRecord = { ...formData, id: Date.now() };
-    const updatedUtilities = [...utilities, newRecord];
-
-    // ✅ Update state and persist instantly
-    setUtilities(updatedUtilities);
-    localStorage.setItem(UTILITIES_KEY, JSON.stringify(updatedUtilities));
-
-    console.log("Added new record:", newRecord);
-    setFormData({ tenant: "", utilityType: "", amount: "", date: "" });
-  };
-
-  // Delete a record
-  const handleDelete = (id) => {
-    if (window.confirm("Delete this record?")) {
-      const updated = utilities.filter((u) => u.id !== id);
+    if (isEditing && formData.id) {
+      const updated = utilities.map((u) => (u.id === formData.id ? formData : u));
       setUtilities(updated);
-      localStorage.setItem(UTILITIES_KEY, JSON.stringify(updated));
+      setIsEditing(false);
+    } else {
+      const newRecord = { ...formData, id: Date.now() };
+      setUtilities([...utilities, newRecord]);
     }
+
+    setFormData({ id: null, tenant: "", utilityType: "", amount: "", date: "" });
   };
 
-  // Filter utilities by selected month
+  // delete record
+  const handleDelete = (id) => {
+    if (!window.confirm("Delete this record?")) return;
+    const updated = utilities.filter((u) => u.id !== id);
+    setUtilities(updated);
+  };
+
+  // edit record
+  const handleEdit = (record) => {
+    setFormData(record);
+    setIsEditing(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // filter by month
   const filteredUtilities = selectedMonth
     ? utilities.filter((u) => {
-        const recordMonth = new Date(u.date).toISOString().slice(0, 7);
-        return recordMonth === selectedMonth;
+        try {
+          const recordMonth = new Date(u.date).toISOString().slice(0, 7);
+          return recordMonth === selectedMonth;
+        } catch {
+          return false;
+        }
       })
     : utilities;
 
-  // Prepare chart data
+  // chart data
   const dailyTotals = filteredUtilities.reduce((acc, record) => {
-    const day = new Date(record.date).getDate();
-    acc[day] = (acc[day] || 0) + parseFloat(record.amount);
+    const day = (() => {
+      try {
+        return new Date(record.date).getDate();
+      } catch {
+        return "unknown";
+      }
+    })();
+    acc[day] = (acc[day] || 0) + Number(record.amount || 0);
     return acc;
   }, {});
 
@@ -120,20 +199,18 @@ export default function UtilitiesControl() {
     .map((t) => {
       const total = filteredUtilities
         .filter((u) => u.tenant === t.name)
-        .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+        .reduce((sum, r) => sum + Number(r.amount || 0), 0);
       return { name: t.name, value: total };
     })
     .filter((p) => p.value > 0);
 
-  // Summary values
   const totalUtilities = filteredUtilities.length;
   const totalCost = filteredUtilities.reduce(
-    (sum, u) => sum + parseFloat(u.amount || 0),
+    (sum, u) => sum + Number(u.amount || 0),
     0
   );
   const activeTenants = new Set(filteredUtilities.map((u) => u.tenant)).size;
 
-  // Format month name if selected
   const monthLabel = selectedMonth
     ? new Date(selectedMonth + "-01").toLocaleString("default", {
         month: "long",
@@ -143,54 +220,41 @@ export default function UtilitiesControl() {
 
   return (
     <div className="p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl shadow-md space-y-6">
-      {/* === Summary Bar === */}
+      {/* === Summary === */}
       <div className="grid md:grid-cols-3 gap-4">
-        <Card className="bg-indigo-600 text-white shadow-md border-none">
+        <Card className="bg-indigo-600 text-white">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">
-              Total Utilities ({monthLabel})
-            </CardTitle>
+            <CardTitle>Total Utilities ({monthLabel})</CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-bold text-center">
             {totalUtilities}
           </CardContent>
         </Card>
-
-        <Card className="bg-green-600 text-white shadow-md border-none">
+        <Card className="bg-green-600 text-white">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">
-              Active Tenants
-            </CardTitle>
+            <CardTitle>Active Tenants</CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-bold text-center">
             {activeTenants}
           </CardContent>
         </Card>
-
-        <Card className="bg-yellow-500 text-white shadow-md border-none">
+        <Card className="bg-yellow-500 text-white">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">
-              Total Cost (Ksh)
-            </CardTitle>
+            <CardTitle>Total Cost (Ksh)</CardTitle>
           </CardHeader>
           <CardContent className="text-3xl font-bold text-center">
-            {totalCost.toLocaleString()}
+            {Number(totalCost).toLocaleString()}
           </CardContent>
         </Card>
       </div>
 
-      {/* === Add Record Form === */}
+      {/* === Form === */}
       <Card className="shadow-lg border-none bg-white">
         <CardHeader className="flex justify-between items-center">
-          <CardTitle className="text-xl font-bold text-indigo-700">
-            Utilities Control
-          </CardTitle>
-
+          <CardTitle className="text-xl font-bold text-indigo-700">Utilities Control</CardTitle>
           <div className="flex items-center gap-3">
             <div>
-              <Label className="text-sm text-gray-600 mr-2">
-                Filter by Month
-              </Label>
+              <Label className="text-sm text-gray-600 mr-2">Filter by Month</Label>
               <Input
                 type="month"
                 value={selectedMonth}
@@ -198,7 +262,6 @@ export default function UtilitiesControl() {
                 className="border rounded p-2"
               />
             </div>
-
             <Button
               onClick={() => setChartType(chartType === "bar" ? "pie" : "bar")}
               className="bg-indigo-600 text-white hover:bg-indigo-700"
@@ -254,20 +317,12 @@ export default function UtilitiesControl() {
 
           <div>
             <Label>Date</Label>
-            <Input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={handleChange}
-            />
+            <Input type="date" name="date" value={formData.date} onChange={handleChange} />
           </div>
 
           <div className="md:col-span-4 flex justify-end">
-            <Button
-              onClick={handleAddUtility}
-              className="bg-indigo-600 hover:bg-indigo-700"
-            >
-              Add Record
+            <Button onClick={handleAddUtility} className="bg-indigo-600 hover:bg-indigo-700">
+              {isEditing ? "Save Changes" : "Add Record"}
             </Button>
           </div>
         </CardContent>
@@ -276,13 +331,10 @@ export default function UtilitiesControl() {
       {/* === Chart Section === */}
       <Card className="shadow-lg border-none bg-white">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-800">
-            {selectedMonth
-              ? `Utilities for ${monthLabel}`
-              : "Monthly Utility Overview"}
+          <CardTitle>
+            {selectedMonth ? `Utilities for ${monthLabel}` : "Monthly Utility Overview"}
           </CardTitle>
         </CardHeader>
-
         <CardContent>
           {chartType === "bar" ? (
             chartData.length > 0 ? (
@@ -295,27 +347,14 @@ export default function UtilitiesControl() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-center text-gray-500">
-                No data for selected month.
-              </p>
+              <p className="text-center text-gray-500">No data for selected month.</p>
             )
           ) : pieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label
-                >
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
                   {pieData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -323,9 +362,7 @@ export default function UtilitiesControl() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-center text-gray-500">
-              No tenant data available.
-            </p>
+            <p className="text-center text-gray-500">No tenant data available.</p>
           )}
         </CardContent>
       </Card>
@@ -333,9 +370,7 @@ export default function UtilitiesControl() {
       {/* === Records Table === */}
       <Card className="shadow-lg border-none bg-white">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-800">
-            Utility Records
-          </CardTitle>
+          <CardTitle>Utility Records</CardTitle>
         </CardHeader>
         <CardContent>
           <table className="w-full text-sm border-collapse">
@@ -354,16 +389,22 @@ export default function UtilitiesControl() {
                   <td className="p-2">{u.tenant}</td>
                   <td className="p-2">{u.utilityType}</td>
                   <td className="p-2">{u.amount}</td>
-                  <td className="p-2">
-                    {new Date(u.date).toLocaleDateString()}
-                  </td>
+                  <td className="p-2">{new Date(u.date).toLocaleDateString()}</td>
                   <td className="p-2 text-right">
-                    <Button
-                      onClick={() => handleDelete(u.id)}
-                      className="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1"
-                    >
-                      Delete
-                    </Button>
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        onClick={() => handleEdit(u)}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-3 py-1"
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        onClick={() => handleDelete(u.id)}
+                        className="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1"
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
